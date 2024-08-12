@@ -1,0 +1,729 @@
+---
+title: "Trabalho A2-R(Grupo 2)"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+Objetivo do trabalho
+=======================================================================
+
+Objetivo do trabalho {data-width=650}
+-----------------------------------------------------------------------
+
+### Introdução ao trabalho
+O objetivo deste trabalho é analisar o perfil dos alunos ingressos nas universidades, abordando principalmente as diferenças entre cursos, gênero e idade. Para fins de maior objetividade, focaremos na análise dos cursos de economia e de graduações tecnológicas. Para isso, nos utilizaremos da base de dados disponibilizada pelo INEP no último censo realizado no Ensino Superior, em 2021. Como conclusão, esperamos obter a distribuição sociodemográfica entre os cursos de nível superior no Brasil e mapear possíveis desigualdades neste âmbito. Para isso, trabalharemos com a construção de uma persona a partir das análises realizadas.
+
+Os dados estão disponíveis em: <https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-da-educacao-superior>
+
+```{r, warning=FALSE}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggridges)
+library(knitr)
+```
+
+```{r, include=FALSE, warning=FALSE}
+#construção e leitura da base de dados
+path <- getwd()
+dados <- read_csv2(paste0(path,"/Microdados do Censo da Educação Superior 2021/dados/MICRODADOS_CADASTRO_CURSOS_2021.csv"), locale = readr::locale(encoding = "latin1"))
+head(dados)
+```
+
+
+```{r}
+faltantes <- colSums(is.na(dados))
+# classificação dos dados faltantes
+```
+
+------------------------------------------------------------------------
+
+Fazendo o primeiro tratamento dos dados
+
+Dado o objetivo do trabalho, será necessário tratarmos os dados para que tenhamos na nossa base apenas os cursos desejados. Assim, faremos um filtro para selecionar apenas os cursos de Economia, de Ciência da Computação e Ciência de Dados (graduações tecnológicas).
+
+```{r, include=FALSE}
+levels(factor(dados$NO_CINE_ROTULO))
+```
+
+```{r, echo=FALSE}
+# construção do filtro dos cursos
+cursos_filtrados <- subset(dados, ((NO_CINE_ROTULO %in% c("Economia", "Ciência da computação", "Ciência de dados")) | (TP_GRAU_ACADEMICO == 3)))
+```
+
+Feito o filtro inicial de acordo com os cursos, nosso objetivo será trabalhar com os dados diferentes para construírmos graficamente uma análise que permita a melhor visualização dos dados.
+
+```{r, include=FALSE}
+cursos_filtrados
+```
+
+```{r, echo=FALSE}
+#criação das variáveis socioeconômicas analisadas
+variaveis_socioeconomicas <- c('TP_GRAU_ACADEMICO', 'IN_GRATUITO', 'TP_MODALIDADE_ENSINO', 'NO_CINE_ROTULO', 'QT_ING_FEM', 'QT_ING_MASC', 'QT_ING_0_17', 'QT_ING_18_24', 'QT_ING_25_29', 'QT_ING_30_34', 'QT_ING_35_39', 'QT_ING_40_49', 'QT_ING_50_59', 'QT_ING_60_MAIS', 'QT_ING_BRANCA', 'QT_ING_PRETA', 'QT_ING_PARDA', 'QT_ING_AMARELA', 'QT_ING_INDIGENA', 'QT_ING_CORND')
+
+# Realizamos os filtros tais que grau academico == 1 (bacharelado), == 3 (tecnológico) e ensino == 1 (presencial)
+
+dados_socioeconomicos <- cursos_filtrados[variaveis_socioeconomicas]
+```
+
+```{r, echo=FALSE}
+# construção da base socociodemográfica que servirá para a caracterizar cada grupo analisado 
+proporcoes_socioeconomicas <- dados_socioeconomicos %>% 
+  group_by(TP_GRAU_ACADEMICO) %>%
+  summarise(proporcao_mulheres = sum(QT_ING_FEM) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_homens = sum(QT_ING_MASC) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_17 = sum(QT_ING_0_17) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_24 = sum(QT_ING_18_24) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_29 = sum(QT_ING_25_29) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_34 = sum(QT_ING_30_34) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_39 = sum(QT_ING_35_39) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_49 = sum(QT_ING_40_49) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_59 = sum(QT_ING_50_59) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_60 = sum(QT_ING_60_MAIS) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_brancos = sum(QT_ING_BRANCA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pretos = sum(QT_ING_PRETA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pardos = sum(QT_ING_PARDA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_amarelos = sum(QT_ING_AMARELA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indigenas = sum(QT_ING_INDIGENA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indeterminados = sum(QT_ING_CORND) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)))
+```
+
+```{r, include=FALSE}
+# criação dos dois grupos analisados
+proporcoes_socioeconomicas$TP_GRAU_ACADEMICO <- c('Graduação', 'Tecnólogo')
+```
+
+
+# Análise Geral
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE}
+#Sumarização das estatísticas de cursos de graduação e tecnólogos usados na análise
+dF_est_desc = na.omit(data.frame(summary(dados_socioeconomicos[-c(which(colnames(dados_socioeconomicos) == 'NO_CINE_ROTULO'))]), stringsAsFactors = F))
+v1 = dF_est_desc[1,colnames(dF_est_desc)[2]]
+dF_aux = dF_est_desc[dF_est_desc[colnames(dF_est_desc)[2]]==v1, colnames(dF_est_desc)[3]]
+
+c_est_desc = c("Variable")
+for (i in c(2:(length(dF_aux)+1))){
+  col = unlist(strsplit(dF_aux[i-1], ':'))
+  c_est_desc[i] = col[1]
+}
+c_est_desc = trimws(c_est_desc)
+
+mat = matrix(nrow = 0, ncol = length(c_est_desc))
+est_desc = data.frame(mat, stringsAsFactors = F)
+colnames(est_desc) = c_est_desc
+```
+
+```{r, echo=FALSE}
+c_var = levels(factor(dF_est_desc$Var2))
+for (l in c(1:length(c_var))){
+  dF_aux = dF_est_desc[dF_est_desc$Var2 == c_var[l], colnames(dF_est_desc)[3]]
+  linha = c(c_var[l])
+  linha = trimws(linha)
+  for (i in c(2:(length(dF_aux)+1))){
+    col = unlist(strsplit(dF_aux[i-1], ':'))
+    col = trimws(col)
+    linha[i] = as.numeric(col[2])
+    }
+  est_desc[l,] = linha
+}
+```
+
+```{r, include=FALSE}
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_mulheres))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_homens))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_17))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_24))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_29))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_34))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_39))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_49))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_59))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_60))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_brancos))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_pretos))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_pardos))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_amarelos))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_indigenas))
+
+ggplot(data=proporcoes_socioeconomicas) +
+  geom_col(aes(TP_GRAU_ACADEMICO, proporcao_indeterminados))
+```
+
+Row {.tabset .tabset-fade}
+------------------------------------------------------------------------
+
+### Análise por gênero
+```{r, echo=FALSE}
+#análise gráfica da participação de cada gênero nos grupos analisados
+library(plotly)
+fig <- plot_ly(proporcoes_socioeconomicas, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_mulheres, 
+               type = 'bar', 
+               name = 'Mulheres')
+fig <- fig %>% add_trace(y = ~proporcao_homens, 
+                         name = 'Homens')
+fig <- fig %>% layout(title = 'Participação por Gênero', 
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack')
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por faixa etária
+```{r, echo=FALSE}
+fig <- plot_ly(proporcoes_socioeconomicas, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_17, 
+               type = 'bar', 
+               name = 'Até 17 anos')
+fig <- fig %>% add_trace(y = ~proporcao_24, 
+                         name = 'De 18 a 24')
+fig <- fig %>% add_trace(y = ~proporcao_29, 
+                         name = 'De 25 a 29')
+fig <- fig %>% add_trace(y = ~proporcao_34, 
+                         name = 'De 30 a 34')
+fig <- fig %>% add_trace(y = ~proporcao_39, 
+                         name = 'De 35 a 39')
+fig <- fig %>% add_trace(y = ~proporcao_49, 
+                         name = 'De 40 a 49')
+fig <- fig %>% add_trace(y = ~proporcao_59, 
+                         name = 'De 50 a 59')
+fig <- fig %>% add_trace(y = ~proporcao_60, 
+                         name = '60 anos ou mais')
+fig <- fig %>% layout(title = 'Participação por Faixa Etária',
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack')
+fig
+```
+
+
+
+------------------------------------------------------------------------
+
+### Análise por Raça/Cor
+```{r, echo=FALSE}
+# participação de cada grupo racial nos dois grupos analisados
+fig <- plot_ly(proporcoes_socioeconomicas, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_brancos, 
+               type = 'bar', 
+               name = 'Brancos')
+fig <- fig %>% add_trace(y = ~proporcao_pardos, 
+                         name = 'Pardos')
+fig <- fig %>% add_trace(y = ~proporcao_pretos, 
+                         name = 'Pretos')
+fig <- fig %>% add_trace(y = ~proporcao_amarelos, 
+                         name = 'Amarelos')
+fig <- fig %>% add_trace(y = ~proporcao_indigenas, 
+                         name = 'Indígenas')
+fig <- fig %>% add_trace(y = ~proporcao_indeterminados, 
+                         name = 'Indeterminados')
+fig <- fig %>% layout(title = 'Participação por Raça/Cor', 
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack')
+fig
+```
+
+
+Economia
+================================================================================
+
+
+```{r, echo=FALSE}
+#Sumarização das estatísticas sociodemográficas do curso de economia
+dados_socioeconomicos_eco = dados_socioeconomicos[dados_socioeconomicos$NO_CINE_ROTULO == 'Economia', ]
+proporcoes_socioeconomicas_eco <- dados_socioeconomicos_eco %>% 
+  group_by(TP_GRAU_ACADEMICO) %>%
+  summarise(proporcao_mulheres = sum(QT_ING_FEM) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_homens = sum(QT_ING_MASC) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_17 = sum(QT_ING_0_17) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_24 = sum(QT_ING_18_24) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_29 = sum(QT_ING_25_29) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_34 = sum(QT_ING_30_34) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_39 = sum(QT_ING_35_39) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_49 = sum(QT_ING_40_49) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_59 = sum(QT_ING_50_59) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_60 = sum(QT_ING_60_MAIS) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_brancos = sum(QT_ING_BRANCA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pretos = sum(QT_ING_PRETA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pardos = sum(QT_ING_PARDA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_amarelos = sum(QT_ING_AMARELA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indigenas = sum(QT_ING_INDIGENA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indeterminados = sum(QT_ING_CORND) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)))
+l = c(levels(factor(dados_socioeconomicos_eco$TP_GRAU_ACADEMICO)))
+```
+
+```{r, echo=FALSE}
+proporcoes_socioeconomicas_eco$TP_GRAU_ACADEMICO <- c('Graduação', 'Tecnólogo')[1:length(l)]
+```
+
+```{r, echo=FALSE}
+dF_est_desc = na.omit(data.frame(summary(dados_socioeconomicos_eco[-c(which(colnames(dados_socioeconomicos_eco) == 'NO_CINE_ROTULO'))]), stringsAsFactors = F))
+v1 = dF_est_desc[1,colnames(dF_est_desc)[2]]
+dF_aux = dF_est_desc[dF_est_desc[colnames(dF_est_desc)[2]]==v1, colnames(dF_est_desc)[3]]
+
+c_est_desc = c("Variable")
+for (i in c(2:(length(dF_aux)+1))){
+  col = unlist(strsplit(dF_aux[i-1], ':'))
+  c_est_desc[i] = col[1]
+}
+c_est_desc = trimws(c_est_desc)
+
+mat = matrix(nrow = 0, ncol = length(c_est_desc))
+est_desc = data.frame(mat, stringsAsFactors = F)
+colnames(est_desc) = c_est_desc
+```
+
+```{r, echo=FALSE}
+c_var = levels(factor(dF_est_desc$Var2))
+for (l in c(1:length(c_var))){
+  dF_aux = dF_est_desc[dF_est_desc$Var2 == c_var[l], colnames(dF_est_desc)[3]]
+  linha = c(c_var[l])
+  linha = trimws(linha)
+  for (i in c(2:(length(dF_aux)+1))){
+    col = unlist(strsplit(dF_aux[i-1], ':'))
+    col = trimws(col)
+    linha[i] = as.numeric(col[2])
+    }
+  est_desc[l,] = linha
+}
+```
+
+Row {.tabset .tabset-fade}
+------------------------------------------------------------------------
+
+### Análise por gênero
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada gênero na graduação de economia
+fig <- plot_ly(proporcoes_socioeconomicas_eco, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_mulheres, 
+               type = 'bar', 
+               name = 'Mulheres') 
+fig <- fig %>% add_trace(y = ~proporcao_homens, 
+                         name = 'Homens') 
+fig <- fig %>% layout(title = 'Participação por Gênero em Economia', 
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack') 
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por faixa etária
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada faixa etária, entre 18 e 59 anos, na graduação de economia
+fig <- plot_ly(proporcoes_socioeconomicas_eco, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_17, 
+               type = 'bar', 
+               name = 'Até 17 anos') 
+fig <- fig %>% add_trace(y = ~proporcao_24, 
+                         name = 'De 18 a 24') 
+fig <- fig %>% add_trace(y = ~proporcao_29, 
+                         name = 'De 25 a 29') 
+fig <- fig %>% add_trace(y = ~proporcao_34, 
+                         name = 'De 30 a 34') 
+fig <- fig %>% add_trace(y = ~proporcao_39, 
+                         name = 'De 35 a 39') 
+fig <- fig %>% add_trace(y = ~proporcao_49, 
+                         name = 'De 40 a 49') 
+fig <- fig %>% add_trace(y = ~proporcao_59, 
+                         name = 'De 50 a 59') 
+fig <- fig %>% add_trace(y = ~proporcao_60, 
+                         name = '60 anos ou mais') 
+fig <- fig %>% layout(title = 'Participação por Faixa Etária em Economia',
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack') 
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por Raça/Cor
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada grupo racial na graduação de economia
+fig <- plot_ly(proporcoes_socioeconomicas_eco, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_brancos, 
+               type = 'bar', 
+               name = 'Brancos') 
+fig <- fig %>% add_trace(y = ~proporcao_pardos, 
+                         name = 'Pardos') 
+fig <- fig %>% add_trace(y = ~proporcao_pretos, 
+                         name = 'Pretos') 
+fig <- fig %>% add_trace(y = ~proporcao_amarelos, 
+                         name = 'Amarelos') 
+fig <- fig %>% add_trace(y = ~proporcao_indigenas, 
+                         name = 'Indígenas') 
+fig <- fig %>% add_trace(y = ~proporcao_indeterminados, 
+                         name = 'Indeterminados') 
+fig <- fig %>% layout(title = 'Participação por Raça/Cor em Economia', 
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack') 
+fig
+```
+
+
+Ciência da Computação
+======================================================================
+
+
+```{r, echo=FALSE}
+#Sumarização das estatísticas sociodemográficas do curso de Ciência da Computação
+dados_socioeconomicos_cdc = dados_socioeconomicos[dados_socioeconomicos$NO_CINE_ROTULO == 'Ciência da computação', ] 
+proporcoes_socioeconomicas_cdc <- dados_socioeconomicos_cdc %>%    
+  group_by(TP_GRAU_ACADEMICO) %>%   
+  summarise(proporcao_mulheres = sum(QT_ING_FEM) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),             
+            proporcao_homens = sum(QT_ING_MASC) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),             
+            proporcao_17 = sum(QT_ING_0_17) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_24 = sum(QT_ING_18_24) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_29 = sum(QT_ING_25_29) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_34 = sum(QT_ING_30_34) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_39 = sum(QT_ING_35_39) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_49 = sum(QT_ING_40_49) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_59 = sum(QT_ING_50_59) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_60 = sum(QT_ING_60_MAIS) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),             
+            proporcao_brancos = sum(QT_ING_BRANCA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),             
+            proporcao_pretos = sum(QT_ING_PRETA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),             
+            proporcao_pardos = sum(QT_ING_PARDA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),             
+            proporcao_amarelos = sum(QT_ING_AMARELA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),             
+            proporcao_indigenas = sum(QT_ING_INDIGENA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),             
+            proporcao_indeterminados = sum(QT_ING_CORND) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)))
+l = c(levels(factor(dados_socioeconomicos_cdc$TP_GRAU_ACADEMICO)))
+```
+
+```{r, echo=FALSE}
+proporcoes_socioeconomicas_cdc$TP_GRAU_ACADEMICO = c('Graduação', 'Tecnólogo')[1:length(l)]
+```
+
+```{r, echo=FALSE}
+dF_est_desc = na.omit(data.frame(summary(dados_socioeconomicos_cdc[-which(colnames(dados_socioeconomicos_cdc) == 'NO_CINE_ROTULO')]), stringsAsFactors = F)) 
+v1 = dF_est_desc[1,colnames(dF_est_desc)[2]] 
+dF_aux = dF_est_desc[dF_est_desc[colnames(dF_est_desc)[2]]==v1, colnames(dF_est_desc)[3]]  
+c_est_desc = c("Variable") 
+for (i in c(2:(length(dF_aux)+1))){   
+  col = unlist(strsplit(dF_aux[i-1], ':'))   
+  c_est_desc[i] = col[1] 
+  } 
+c_est_desc = trimws(c_est_desc)  
+mat = matrix(nrow = 0, 
+             ncol = length(c_est_desc)) 
+est_desc = data.frame(mat, stringsAsFactors = F) 
+colnames(est_desc) = c_est_desc
+```
+
+```{r, echo=FALSE}
+c_var = levels(factor(dF_est_desc$Var2)) 
+for (l in c(1:length(c_var))){   
+  dF_aux = dF_est_desc[dF_est_desc$Var2 == c_var[l], colnames(dF_est_desc)[3]]   
+  linha = c(c_var[l])   
+  linha = trimws(linha)   
+  for (i in c(2:(length(dF_aux)+1))){     
+    col = unlist(strsplit(dF_aux[i-1], ':'))     
+    col = trimws(col)     
+    linha[i] = as.numeric(col[2])     
+    }   
+  est_desc[l,] = linha 
+  } 
+```
+
+Row {.tabset .tabset-fade}
+------------------------------------------------------------------------
+
+### Análise por gênero
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada gênero na graduação de ciência da computação
+fig <- plot_ly(proporcoes_socioeconomicas_cdc,
+               x = ~TP_GRAU_ACADEMICO,
+               y = ~proporcao_mulheres,
+               type = 'bar',
+               name = 'Mulheres')
+fig <- fig %>% add_trace(y = ~proporcao_homens,
+                         name = 'Homens')  
+fig <- fig %>% layout(title = 'Participação por Gênero em Ciência da Computação',
+                      yaxis = list(title = 'Proporção'),
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'),
+                      barmode = 'stack')  
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por faixa etária
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada faixa etária, entre 18 e 59 anos, na graduação de ciência da computação
+fig <- plot_ly(proporcoes_socioeconomicas_cdc,
+               x = ~TP_GRAU_ACADEMICO,
+               y = ~proporcao_17,
+               type = 'bar',
+               name = 'Até 17 anos')  
+fig <- fig %>% add_trace(y = ~proporcao_24,
+                         name = 'De 18 a 24')  
+fig <- fig %>% add_trace(y = ~proporcao_29, 
+                         name = 'De 25 a 29')  
+fig <- fig %>% add_trace(y = ~proporcao_34,     
+                         name = 'De 30 a 34')  
+fig <- fig %>% add_trace(y = ~proporcao_39,       
+                         name = 'De 35 a 39')  
+fig <- fig %>% add_trace(y = ~proporcao_49,         
+                         name = 'De 40 a 49')  
+fig <- fig %>% add_trace(y = ~proporcao_59,        
+                         name = 'De 50 a 59')  
+fig <- fig %>% add_trace(y = ~proporcao_60,     
+                         name = '60 anos ou mais') 
+fig <- fig %>% layout(title = 'Participação por Faixa Etária em Ciência da Computação',
+                      yaxis = list(title = 'Proporção'),   
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'),  
+                      barmode = 'stack') 
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por Raça/Cor
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada grupo racial na graduação de ciência da computação
+fig <- plot_ly(proporcoes_socioeconomicas_cdc,
+               x = ~TP_GRAU_ACADEMICO,         
+               y = ~proporcao_brancos,     
+               type = 'bar',             
+               name = 'Brancos')  
+fig <- fig %>% add_trace(y = ~proporcao_pardos,
+                         name = 'Pardos')  
+fig <- fig %>% add_trace(y = ~proporcao_pretos,   
+                         name = 'Pretos')  
+fig <- fig %>% add_trace(y = ~proporcao_amarelos,   
+                         name = 'Amarelos')  
+fig <- fig %>% add_trace(y = ~proporcao_indigenas,   
+                         name = 'Indígenas')  
+fig <- fig %>% add_trace(y = ~proporcao_indeterminados,  
+                         name = 'Indeterminados')  
+fig <- fig %>% layout(title = 'Participação por Raça/Cor em Ciência da Computação',
+                      yaxis = list(title = 'Proporção'),   
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'),     
+                      barmode = 'stack') 
+fig
+```
+
+Ciência de Dados
+============================================================================
+
+
+```{r, echo=FALSE}
+#Sumarização das estatísticas sociodemográficas do curso de Ciência de Dados
+dados_socioeconomicos_cdd = dados_socioeconomicos[dados_socioeconomicos$NO_CINE_ROTULO == 'Ciência de dados', ]
+proporcoes_socioeconomicas_cdd <- dados_socioeconomicos_cdd %>% 
+  group_by(TP_GRAU_ACADEMICO) %>%
+  summarise(proporcao_mulheres = sum(QT_ING_FEM) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_homens = sum(QT_ING_MASC) / (sum(QT_ING_MASC) + sum(QT_ING_FEM)),
+            proporcao_17 = sum(QT_ING_0_17) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_24 = sum(QT_ING_18_24) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_29 = sum(QT_ING_25_29) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_34 = sum(QT_ING_30_34) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_39 = sum(QT_ING_35_39) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_49 = sum(QT_ING_40_49) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_59 = sum(QT_ING_50_59) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_60 = sum(QT_ING_60_MAIS) / (sum(QT_ING_0_17) + sum(QT_ING_18_24) + sum(QT_ING_25_29) + sum(QT_ING_30_34) + sum(QT_ING_35_39) + sum(QT_ING_40_49) + sum(QT_ING_50_59) + sum(QT_ING_60_MAIS)),
+            proporcao_brancos = sum(QT_ING_BRANCA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pretos = sum(QT_ING_PRETA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_pardos = sum(QT_ING_PARDA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_amarelos = sum(QT_ING_AMARELA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indigenas = sum(QT_ING_INDIGENA) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)),
+            proporcao_indeterminados = sum(QT_ING_CORND) / (sum(QT_ING_BRANCA) + sum(QT_ING_PRETA) + sum(QT_ING_PARDA) + sum(QT_ING_AMARELA) + sum(QT_ING_INDIGENA) + sum(QT_ING_CORND)))
+l = c(levels(factor(dados_socioeconomicos_cdd$TP_GRAU_ACADEMICO)))
+```
+
+```{r, echo=FALSE}
+proporcoes_socioeconomicas_cdd$TP_GRAU_ACADEMICO = c('Graduação', 'Tecnólogo')[1:length(l)]
+```
+
+```{r, echo=FALSE}
+dF_est_desc = na.omit(data.frame(summary(dados_socioeconomicos_cdd[-c(which(colnames(dados_socioeconomicos_cdd) == 'NO_CINE_ROTULO'))]), stringsAsFactors = F))
+v1 = dF_est_desc[1,colnames(dF_est_desc)[2]]
+dF_aux = dF_est_desc[dF_est_desc[colnames(dF_est_desc)[2]]==v1, colnames(dF_est_desc)[3]]
+
+c_est_desc = c("Variable")
+for (i in c(2:(length(dF_aux)+1))){
+  col = unlist(strsplit(dF_aux[i-1], ':'))
+  c_est_desc[i] = col[1]
+}
+c_est_desc = trimws(c_est_desc)
+
+mat = matrix(nrow = 0, ncol = length(c_est_desc))
+est_desc = data.frame(mat, stringsAsFactors = F)
+colnames(est_desc) = c_est_desc
+```
+
+```{r, echo=FALSE}
+c_var = levels(factor(dF_est_desc$Var2))
+for (l in c(1:length(c_var))){
+  dF_aux = dF_est_desc[dF_est_desc$Var2 == c_var[l], colnames(dF_est_desc)[3]]
+  linha = c(c_var[l])
+  linha = trimws(linha)
+  for (i in c(2:(length(dF_aux)+1))){
+    col = unlist(strsplit(dF_aux[i-1], ':'))
+    col = trimws(col)
+    linha[i] = as.numeric(col[2])
+    }
+  est_desc[l,] = linha
+}
+```
+
+
+Row {.tabset .tabset-fade}
+------------------------------------------------------------------------
+
+### Análise por gênero
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada gênero na graduação de ciência de dados
+fig <- plot_ly(proporcoes_socioeconomicas_cdd, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_mulheres, 
+               type = 'bar', 
+               name = 'Mulheres') 
+fig <- fig %>% add_trace(y = ~proporcao_homens, 
+                         name = 'Homens') 
+fig <- fig %>% layout(title = 'Participação por Gênero em Ciência de Dados', 
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack') 
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por faixa etária
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada faixa etária, entre 18 e 59 anos, na graduação de ciência de dados
+fig <- plot_ly(proporcoes_socioeconomicas_cdd, 
+               x = ~TP_GRAU_ACADEMICO, 
+               y = ~proporcao_17, 
+               type = 'bar', 
+               name = 'Até 17 anos') 
+fig <- fig %>% add_trace(y = ~proporcao_24, 
+                         name = 'De 18 a 24') 
+fig <- fig %>% add_trace(y = ~proporcao_29, 
+                         name = 'De 25 a 29') 
+fig <- fig %>% add_trace(y = ~proporcao_34, 
+                         name = 'De 30 a 34') 
+fig <- fig %>% add_trace(y = ~proporcao_39, 
+                         name = 'De 35 a 39') 
+fig <- fig %>% add_trace(y = ~proporcao_49, 
+                         name = 'De 40 a 49') 
+fig <- fig %>% add_trace(y = ~proporcao_59, 
+                         name = 'De 50 a 59') 
+fig <- fig %>% add_trace(y = ~proporcao_60, 
+                         name = '60 anos ou mais') 
+fig <- fig %>% layout(title = 'Participação por Faixa Etária em Ciência de Dados',
+                      yaxis = list(title = 'Proporção'), 
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'), 
+                      barmode = 'stack') 
+fig
+```
+
+------------------------------------------------------------------------
+
+### Análise por Raça/Cor
+
+```{r, echo=FALSE}
+#análise gráfica da participação de cada grupo racial na graduação de ciência de dados
+fig <- plot_ly(proporcoes_socioeconomicas_cdd,
+               x = ~TP_GRAU_ACADEMICO,         
+               y = ~proporcao_brancos,     
+               type = 'bar',             
+               name = 'Brancos')  
+fig <- fig %>% add_trace(y = ~proporcao_pardos,
+                         name = 'Pardos')  
+fig <- fig %>% add_trace(y = ~proporcao_pretos,   
+                         name = 'Pretos')  
+fig <- fig %>% add_trace(y = ~proporcao_amarelos,   
+                         name = 'Amarelos')  
+fig <- fig %>% add_trace(y = ~proporcao_indigenas,   
+                         name = 'Indígenas')  
+fig <- fig %>% add_trace(y = ~proporcao_indeterminados,  
+                         name = 'Indeterminados')  
+fig <- fig %>% layout(title = 'Participação por Raça/Cor em Ciência de Dados',
+                      yaxis = list(title = 'Proporção'),   
+                      xaxis = list(title = 'Tipo de Grau Acadêmico'),     
+                      barmode = 'stack') 
+fig
+```
+
+-----------------------------------------------------------------------------
+
+Conclusão
+==============================================================================
+
+### Conclusão
+Após finalizar o processo de limpeza de dados, procedeu-se para as análises gráficas e estatísticas. Nelas, buscou-se compreender qual a representitivade de gênero, idade e cor nos cursos educacionais estudados. Como resultado destas análises, tem-se a comparação entre graduações científicas e tecnólogos; entre as próprias graduações científicas e a possibilidade da criação de personas para cada curso.
+
+No primeiro caso, revelou-se uma alta desigualdade presente nas graduações, enquanto os tecnólogos mostraram-se mais diversos. Em relação ao gênero, os homens são predominantes nas graduações, enquanto nos tecnólogos há uma distribuição maior. Em relação à idade, os alunos entre 18 e 24 anos são a maioria nas graduações, mas nos tecnólogos há uma variedade significativa, havendo um equilíbrio considerável na proporção de cada faixa etária até os 49 anos. Em relação à cor, os brancos são maioria em ambas as modalidades educacionais, apesar de o tecnólogo ser mais diverso. Dessa forma, o tecnólogo apresenta-se como mais aberto à diversidade que as graduações tecnológicas.
+
+No segundo, a comparação entre cursos de graduação científicas revelou algumas heterogeneidades interessantes. Na seção de gênero, o curso de Ciência da Computação possui maior concentração de homens, enquanto Economia e Ciência de Dados são um pouco mais diversificados. Na seção de idade, o curso de Ciência de Dados destaca-se como o mais diversificado - com proporções consideráveis de alunos desde os 18 até os 49 anos - enquanto Economia e Ciência da Computação ficam para trás nesse quesito. Por fim, a seção de cor/raça demonstra que a maioria dos estudantes dos cursos de graduação analisados são brancos em todos os cursos. Assim, Economia destaca-se como o curso mais diversificado no geral e Ciência de Dados desponta na frente no quesito idade.
+
+No terceiro caso, buscando-se refinar ainda mais a análise dos perfis dos alunos em cursos tecnológicos e em cada curso de graduação, foram criadas duas personas para cada um deles:
+
+Em resumo, há uma alta concentração de homens, brancos e jovens nas graduações científicas e maior diversidade nos tecnólogos. Isso implica em um público distinto para a primeira modalidade educacional em relação a primeira. No entanto, vale citar que uma importante exceção consiste na variável de idade para o curso de Ciência de Dados, o qual é altamente diverso nesse quesito. Portanto, urge a necessidade de se levar essas heterogeneidades em consideração no momento de se implementar políticas públicas.
+
+-----------------------------------------------------------------------------------------------------------------------------
+### Personas
+
+No caso dos cursos tecnólogos, foram criados duas personas. A primeira é uma mulher branca, entre 18 e 24 anos, e a segunda é uma mulher parda, entre 25 e 29 anos. Esses perfis indicam a maior diversificação presente nos cursos tecnológicos e a complementariedade desses perfis em relação aos de graduações científicas.
+
+No caso dos cursos de Economia e Ciência da Computação, foram criadas personas comuns devido às distribuições de proporções semelhantes para eles. O primeiro perfil seria o de um homem branco entre 18 e 24 anos, enquanto o segundo seria de um homem entre 18 e 24 anos, mas pardo. Isso mostra que, apesar de haver uma certa diversidade étnica, existe uma alta concentração de gênero e etária nesses cursos.
+
+No caso dos cursos de Ciência de Dados, é possível observar mais diversidade que nos anteriores. Por isso, a primeira persona seria de um homem branco, entre 18 e 49 anos. No entanto, ao considerar-se o tecnólogo, é viável observar o perfil de um homem pardo, entre 40 e 49 anos. Assim, o curso de Ciência de Dados destaca-se por deter maior diversidade que os anteriores mais uma vez.
